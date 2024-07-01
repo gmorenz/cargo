@@ -66,6 +66,10 @@ impl fmt::Display for ProcessBuilder {
             write!(f, " {}", escape(arg.to_string_lossy()))?;
         }
 
+        for (key, val) in self.get_envs() {
+            write!(f, " {key}={}", escape(val.as_ref().unwrap_or(&OsString::new()).to_string_lossy()))?
+        }
+
         write!(f, "`")
     }
 }

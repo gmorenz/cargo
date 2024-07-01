@@ -889,6 +889,7 @@ impl<'gctx> RustcTargetData<'gctx> {
         let mut target_config = HashMap::new();
         let mut target_info = HashMap::new();
         let target_applies_to_host = gctx.target_applies_to_host()?;
+        let host_target = CompileTarget::new(&rustc.host)?;
         let host_info = TargetInfo::new(gctx, requested_kinds, &rustc, CompileKind::Host)?;
         let host_config = if target_applies_to_host {
             gctx.target_cfg_triple(&rustc.host)?
@@ -902,10 +903,22 @@ impl<'gctx> RustcTargetData<'gctx> {
         // needs access to the target config data, create a copy so that it
         // can be found. See `rebuild_unit_graph_shared` for why this is done.
         if requested_kinds.iter().any(CompileKind::is_host) {
-            let ct = CompileTarget::new(&rustc.host)?;
-            target_info.insert(ct, host_info.clone());
-            target_config.insert(ct, gctx.target_cfg_triple(&rustc.host)?);
+            target_config.insert(host_target, gctx.target_cfg_triple(&rustc.host)?);
         };
+
+        // If target_applies_to_host is true, the host_info is the target info,
+        // otherwise we need to build target info for the target.
+        if target_applies_to_host {
+            target_info.insert(host_target, host_info.clone());
+        } else {
+            let host_target_info = TargetInfo::new(
+                gctx,
+                requested_kinds,
+                &rustc,
+                CompileKind::Target(host_target),
+            )?;
+            target_info.insert(host_target, host_target_info);
+        }
 
         let mut res = RustcTargetData {
             rustc,
