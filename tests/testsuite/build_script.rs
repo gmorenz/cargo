@@ -5828,6 +5828,25 @@ fn links_overrides_with_target_applies_to_host() {
         .with_status(0)
         .run();
 
+    // The name is different on windows because ".dll" is not automatically
+    // appenended like the extension on other OSes is, despite being needed.
+
+    // The path is different on windows because we need the "name.dll.lib" file
+    // to link to it, and as per #3934 that only lives in `target/{profile}/deps`
+    // and isn't copied to `target/{profile}` like the .dll is. #3951 removed the
+    // hash mentioned in #3934 but did not change the directory of the .lib file.
+
+    // Meanwhile on other operating systems everything we need to link (which is
+    // just the linux .so/the macos .dylib) is copied to `target/{profile}` from
+    //  `deps` and as the blessed output artifact that seems to be the appropriate
+    // version to use.
+    let mylib_name = if cfg!(windows) { "mylib.dll" } else { "mylib" };
+    let mylib_path = if cfg!(windows) {
+        "mylib-c/target/debug/deps"
+    } else {
+        "mylib-c/target/debug"
+    };
+
     p.cargo("build")
         .masquerade_as_nightly_cargo(&["target-applies-to-host"])
         .args(&[
@@ -5837,10 +5856,13 @@ fn links_overrides_with_target_applies_to_host() {
         ])
         .args(&[
             "--config",
-            &format!(r#"target.{}.mylib.rustc-link-lib=["mylib"]"#, rustc_host()),
+            &format!(
+                r#"target.{}.mylib.rustc-link-lib=["{mylib_name}"]"#,
+                rustc_host()
+            ),
             "--config",
             &format!(
-                r#"target.{}.mylib.rustc-link-search=["mylib-c/target/debug"]"#,
+                r#"target.{}.mylib.rustc-link-search=["{mylib_path}"]"#,
                 rustc_host()
             ),
         ])
